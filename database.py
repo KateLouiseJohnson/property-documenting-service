@@ -1,10 +1,9 @@
 from configparser import ConfigParser
+from models import Property
 from typing import Dict
 from xmlrpc.client import boolean
 from constants import PROPERTIES_TABLE_NAME
 import psycopg2
-import psycopg2.extras as psql_extras
-import pandas as pd
 
 def load_connection_info(
     ini_filename: str
@@ -15,7 +14,7 @@ def load_connection_info(
     return conn_info
 
 
-def connect_to_database(conn_info: str='') -> psycopg2.extensions.connection:
+def get_connection(conn_info: str='') -> psycopg2.extensions.connection:
     if conn_info == '':
         conn_info = load_connection_info("db.ini")
 
@@ -61,7 +60,7 @@ def create_table(
 
 
 def setup_database() -> None:
-    connection = connect_to_database()
+    connection = get_connection()
     cursor = connection.cursor()
 
     create_table(PROPERTIES_TABLE_NAME, connection, cursor)
@@ -73,21 +72,22 @@ def setup_database() -> None:
 def insert_property(
     conn: psycopg2.extensions.connection,
     cur: psycopg2.extensions.cursor,
-    df: pd.DataFrame,
-    page_size: int
-) -> None:
-    data_tuples = [tuple(row.to_numpy()) for index, row in df.iterrows()]
+    property_data: Property
+) -> str:
+    query = """
+        INSERT INTO properties(street) 
+        VALUES ('{street}')
+        RETURNING id
+    """.format(street=property_data.address.street)
 
     try:
-        psql_extras.execute_values(
-            cur, query, data_tuples, page_size=page_size)
-        print("Query:", cur.query)
+        cur.execute( query )
+        id = cur.fetchone()[0]
+        conn.commit()
+        return str(id)
 
     except Exception as error:
         print(f"{type(error).__name__}: {error}")
-        print("Query:", cur.query)
+        print("Query:", query)
         conn.rollback()
         cur.close()
-
-    else:
-        conn.commit()
