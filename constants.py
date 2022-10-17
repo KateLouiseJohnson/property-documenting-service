@@ -1,0 +1,1 @@
+PROPERTIES_TABLE_NAME='properties'

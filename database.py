@@ -1,5 +1,7 @@
 from configparser import ConfigParser
 from typing import Dict
+from xmlrpc.client import boolean
+from constants import PROPERTIES_TABLE_NAME
 import psycopg2
 import psycopg2.extras as psql_extras
 import pandas as pd
@@ -13,68 +15,60 @@ def load_connection_info(
     return conn_info
 
 
-def create_db(
-    conn_info: Dict[str, str],
-) -> None:
-    psql_connection_string = f"host={conn_info['host']} user={conn_info['user']} password={conn_info['password']}"
-    print(psql_connection_string)
-    conn = psycopg2.connect(psql_connection_string)
-    cur = conn.cursor()
-    conn.autocommit = True
-    sql_query = f"CREATE DATABASE {conn_info['database']}"
+def connect_to_database(conn_info: str='') -> psycopg2.extensions.connection:
+    if conn_info == '':
+        conn_info = load_connection_info("db.ini")
 
-    try:
-        cur.execute(sql_query)
-    except Exception as e:
-        print(f"{type(e).__name__}: {e}")
-        print(f"Query: {cur.query}")
-        cur.close()
-    else:
-        conn.autocommit = False
+    return psycopg2.connect(**conn_info)
+
+
+def table_exists(
+    table_name: str,     
+    cur: psycopg2.extensions.cursor
+) -> boolean:
+    query="""
+        SELECT EXISTS(
+            SELECT * FROM information_schema.tables 
+            WHERE table_name='{table_name}'
+            )
+    """.format(table_name=table_name)
+
+    cur.execute(query)
+    return bool(cur.fetchone()[0])
 
 
 def create_table(
-    sql_query: str, 
+    table_name: str,
     conn: psycopg2.extensions.connection, 
     cur: psycopg2.extensions.cursor
 ) -> None:
-    try:
-        cur.execute(sql_query)
-    except Exception as e:
-        print(f"{type(e).__name__}: {e}")
-        print(f"Query: {cur.query}")
-        conn.rollback()
-        cur.close()
-    else:
-        conn.commit()
+    if not table_exists(table_name, cur):
+        query = """
+            CREATE TABLE {table_name} (
+                id SERIAL PRIMARY KEY,
+                street VARCHAR(200) NOT NULL
+            )
+        """.format(table_name=table_name)
+        try:
+            cur.execute(query)
+        except Exception as e:
+            print(f"{type(e).__name__}: {e}")
+            print(f"Query: {cur.query}")
+            conn.rollback()
+            cur.close()
+        else:
+            conn.commit()
 
 
 def setup_database() -> None:
-    conn_info = load_connection_info("db.ini")
-    
-    create_db(conn_info)
-
-    connection = psycopg2.connect(**conn_info)
+    connection = connect_to_database()
     cursor = connection.cursor()
 
-    house_sql = """
-        CREATE TABLE properties (
-            id SERIAL PRIMARY KEY,
-            street VARCHAR(200) NOT NULL
-        )
-    """
-    create_table(house_sql, connection, cursor)
+    create_table(PROPERTIES_TABLE_NAME, connection, cursor)
 
     connection.close()
     cursor.close()
 
-
-def connect_to_database() -> psycopg2.extensions.connection:
-    conn_info = load_connection_info("db.ini")
-    connection = psycopg2.connect(**conn_info)
-
-    return connection
-    
 
 def insert_property(
     conn: psycopg2.extensions.connection,

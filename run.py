@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from models import Property
-from database import setup_database, connect_to_database
+from database import setup_database
 
 setup_database()
 app = FastAPI()

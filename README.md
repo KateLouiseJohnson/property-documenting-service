@@ -6,5 +6,6 @@ A property documenting service that exposes an api for maintaining property data
 
 ```bash
 pip install -r requirements.txt
+docker compose up
 uvicorn run:app --reload
 ```
