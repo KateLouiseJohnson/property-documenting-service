@@ -25,6 +25,9 @@ def table_exists(
     table_name: str,     
     cur: psycopg2.extensions.cursor
 ) -> boolean:
+    # TODO: It seems like there are some good packages available out there to 
+    # create sql queries in a nicer way than just having a bunch of strings. 
+    # Given the time I would have looked into this.
     query="""
         SELECT EXISTS(
             SELECT * FROM information_schema.tables 
